@@ -4,6 +4,20 @@ from openwakeword.model import Model # wake-word detection model
 import os
 import wave
 import whisper
+import ollama
+
+import imageio_ffmpeg
+import pyttsx3
+
+#  initialize TTS Engine 
+tts_engine = pyttsx3.init()
+# Optional: Set voice rate/speed (default is usually ~200)
+tts_engine.setProperty('rate', 180)
+
+def speak(text):
+    print(f"[BIMO SPEAKING]: {text}")
+    tts_engine.say(text)
+    tts_engine.runAndWait()
 
 WAKE_WORD_MODEL = "./wakeword.onnx"
 owwModel = Model(wakeword_models=[WAKE_WORD_MODEL])
@@ -11,6 +25,10 @@ owwModel = Model(wakeword_models=[WAKE_WORD_MODEL])
 # Transcribe Audio using Local Whisper Model
 print("[BIMO Engine] Loading local Whisper model (tiny.en)...")
 model = whisper.load_model("tiny.en")
+
+# ---- Dynamic FFmpeg path setup ----
+ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
 
 # 2. Audio Capture Settings, here we configure microphone and tell python how to capture audio
 AUDIO_FILE = "recorded_prompt.wav"
@@ -73,11 +91,42 @@ try:
             # fp16=False suppresses the CPU warning and processes audio on CPU directly
             result = model.transcribe(AUDIO_FILE, fp16=False)
 
-            print("\n--------------------------------------------------")
-            print(f"⚡ [BIMO TRANSCRIBED TEXT]: {result['text'].strip()}")
-            print("--------------------------------------------------\n")
+            # print("\n--------------------------------------------------")
+            # print(f"⚡ [BIMO TRANSCRIBED TEXT]: {result['text'].strip()}")
+            # print("--------------------------------------------------\n")
+            
+            prompt = result['text'].strip()
 
-except KeyboardInterrupt:
+            if not prompt:
+                print("[BIMO Engine] Didn't catch any speech.")
+                continue
+
+            print(f"[BIMO PROMPT]: {prompt}")
+
+            # send prompt to gemma 
+            response = ollama.chat(
+                model = 'gemma:2b',
+                messages = [
+                    {
+                        'role': 'system',
+                        'content': 'You are BIMO, a cheerful offline assistant. Keep responses under 2 sentences.'
+                    },
+                    {
+                        'role': 'user',
+                        'content': prompt
+                    }
+                ]
+            )
+
+            answer = response['message']['content'].strip()
+            print(f"[BIMO AI]: {answer}")
+
+            # --- ANNOUNCE RESPONSE VIA TTS ---
+            speak(answer)
+
+            break
+
+finally:
     mic_stream.stop_stream()
     mic_stream.close()
     audio.terminate()
