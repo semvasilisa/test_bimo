@@ -7,17 +7,28 @@ import whisper
 import ollama
 
 import imageio_ffmpeg
-import pyttsx3
+from piper import PiperVoice
+import sounddevice as sd
 
-#  initialize TTS Engine 
-tts_engine = pyttsx3.init()
-# Optional: Set voice rate/speed (default is usually ~200)
-tts_engine.setProperty('rate', 180)
+# --- 0. Initialize Piper Neural TTS ---
+MODEL_PATH = "en_US-amy-medium.onnx"
+print("[BIMO Engine] Loading Piper neural voice model...")
+voice = PiperVoice.load(MODEL_PATH)
 
 def speak(text):
     print(f"[BIMO SPEAKING]: {text}")
-    tts_engine.say(text)
-    tts_engine.runAndWait()
+    
+    # Generate audio chunks using Piper
+    audio_bytes = bytearray()
+    for chunk in voice.synthesize(text):
+        audio_bytes.extend(chunk.audio_int16_bytes)
+    
+    # Convert raw bytes to a 16-bit PCM numpy array
+    audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+    
+    # Play through speakers using the model's sample rate
+    sd.play(audio_np, samplerate=voice.config.sample_rate)
+    sd.wait()
 
 WAKE_WORD_MODEL = "./wakeword.onnx"
 owwModel = Model(wakeword_models=[WAKE_WORD_MODEL])
@@ -91,10 +102,6 @@ try:
             # fp16=False suppresses the CPU warning and processes audio on CPU directly
             result = model.transcribe(AUDIO_FILE, fp16=False)
 
-            # print("\n--------------------------------------------------")
-            # print(f"⚡ [BIMO TRANSCRIBED TEXT]: {result['text'].strip()}")
-            # print("--------------------------------------------------\n")
-            
             prompt = result['text'].strip()
 
             if not prompt:
