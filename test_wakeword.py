@@ -10,6 +10,8 @@ import imageio_ffmpeg
 from piper import PiperVoice
 import sounddevice as sd
 
+from router import answer_question
+
 # --- 0. Initialize Piper Neural TTS ---
 MODEL_PATH = "en_US-amy-medium.onnx"
 print("[BIMO Engine] Loading Piper neural voice model...")
@@ -110,22 +112,27 @@ try:
 
             print(f"[BIMO PROMPT]: {prompt}")
 
-            # send prompt to gemma 
-            response = ollama.chat(
-                model = 'gemma:2b',
-                messages = [
-                    {
-                        'role': 'system',
-                        'content': 'You are BIMO, a cheerful offline assistant. Keep responses under 2 sentences.'
-                    },
-                    {
-                        'role': 'user',
-                        'content': prompt
-                    }
-                ]
-            )
+            # # send prompt to gemma 
+            # response = ollama.chat(
+            #     model = 'gemma:2b',
+            #     messages = [
+            #         {
+            #             'role': 'system',
+            #             'content': 'You are BIMO, a cheerful offline assistant. Keep responses under 2 sentences.'
+            #         },
+            #         {
+            #             'role': 'user',
+            #             'content': prompt
+            #         }
+            #     ]
+            # )
 
-            answer = response['message']['content'].strip()
+            # answer = response['message']['content'].strip()
+
+            # ----- HERE WE ADD THE ROUTER LOGIC -----
+            # Send the transcript to the router
+            answer = answer_question(prompt)
+            
             print(f"[BIMO AI]: {answer}")
 
             # --- ANNOUNCE RESPONSE VIA TTS ---
