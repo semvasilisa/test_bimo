@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 import os
 import requests
 from tavily import TavilyClient
 from datetime import datetime
+import secrets
 
 # tavily key defined
 tavily_api_key = os.getenv("TAVILY_API_KEY")
@@ -34,7 +35,21 @@ class AskRequest(BaseModel):
     prompt: str
 
 @app.post("/ask")
-def ask_question(request: AskRequest): # here we mention class name so fastapi knows to expect a json body containing prompt
+def ask_question(request: AskRequest, x_bimo_token: str | None = Header(default=None, alias="x-bimo-token")): # here we mention class name so fastapi knows to expect a json body containing prompt
+    # check the secret token before doing any work, compares client input and environmental variable
+    if (
+        not x_bimo_token 
+        or not secrets.compare_digest(
+            x_bimo_token.encode("utf-8"), 
+            bimo_token.encode("utf-8")
+        )
+    ): 
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing BIMO token"
+        )
+
+    # only authorized requests reach this point
     question = request.prompt
     context = search_web(question)
 
